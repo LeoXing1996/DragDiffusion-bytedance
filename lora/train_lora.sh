@@ -7,7 +7,7 @@ export LORA_RANK=16
 accelerate launch lora/train_dreambooth_lora.py \
   --pretrained_model_name_or_path=$MODEL_NAME  \
   --instance_data_dir=$SAMPLE_DIR \
-  --output_dir=$OUTPUT_DIR \
+  --output_dir=$OUTPUT_DIR
   --instance_prompt="a photo of a sculpture" \
   --resolution=512 \
   --train_batch_size=1 \

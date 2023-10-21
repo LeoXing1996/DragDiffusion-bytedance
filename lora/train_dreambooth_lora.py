@@ -1,7 +1,7 @@
 # *************************************************************************
 # This file may have been modified by Bytedance Inc. (“Bytedance Inc.'s Mo-
 # difications”). All Bytedance Inc.'s Modifications are Copyright (2023) B-
-# ytedance Inc..  
+# ytedance Inc..
 # *************************************************************************
 
 import argparse
@@ -50,7 +50,8 @@ from diffusers.models.attention_processor import (
     SlicedAttnAddedKVProcessor,
 )
 from diffusers.optimization import get_scheduler
-from diffusers.utils import TEXT_ENCODER_ATTN_MODULE, check_min_version, is_wandb_available
+# from diffusers.utils import TEXT_ENCODER_ATTN_MODULE, check_min_version, is_wandb_available
+from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
 
 
@@ -147,10 +148,17 @@ def parse_args(input_args=None):
         help="Pretrained tokenizer name or path if not the same as model_name",
     )
     parser.add_argument(
+        "--instance_data",
+        type=str,
+        default=None,
+        required=False,
+        help="The training data of *the instance image*.",
+    )
+    parser.add_argument(
         "--instance_data_dir",
         type=str,
         default=None,
-        required=True,
+        required=False,
         help="A folder containing the training data of instance images.",
     )
     parser.add_argument(
@@ -473,7 +481,6 @@ class DreamBoothDataset(Dataset):
 
     def __init__(
         self,
-        instance_data_root,
         instance_prompt,
         tokenizer,
         class_data_root=None,
@@ -484,6 +491,8 @@ class DreamBoothDataset(Dataset):
         encoder_hidden_states=None,
         instance_prompt_encoder_hidden_states=None,
         tokenizer_max_length=None,
+        instance_data_root=None,
+        instance_data=None,
     ):
         self.size = size
         self.center_crop = center_crop
@@ -492,11 +501,14 @@ class DreamBoothDataset(Dataset):
         self.instance_prompt_encoder_hidden_states = instance_prompt_encoder_hidden_states
         self.tokenizer_max_length = tokenizer_max_length
 
-        self.instance_data_root = Path(instance_data_root)
-        if not self.instance_data_root.exists():
-            raise ValueError("Instance images root doesn't exists.")
+        if instance_data is not None:
+            self.instance_images_path = [instance_data]
+        elif instance_data_root is not None:
+            self.instance_data_root = Path(instance_data_root)
+            if not self.instance_data_root.exists():
+                raise ValueError("Instance images root doesn't exists.")
+            self.instance_images_path = list(Path(instance_data_root).iterdir())
 
-        self.instance_images_path = list(Path(instance_data_root).iterdir())
         self.num_instance_images = len(self.instance_images_path)
         self.instance_prompt = instance_prompt
         self._length = self.num_instance_images
@@ -651,13 +663,15 @@ def encode_prompt(text_encoder, input_ids, attention_mask, text_encoder_use_atte
 def main(args):
     logging_dir = Path(args.output_dir, args.logging_dir)
 
-    accelerator_project_config = ProjectConfiguration(total_limit=args.checkpoints_total_limit)
+    accelerator_project_config = ProjectConfiguration(
+        total_limit=args.checkpoints_total_limit,
+        logging_dir=logging_dir)
 
     accelerator = Accelerator(
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         mixed_precision=args.mixed_precision,
         log_with=args.report_to,
-        logging_dir=logging_dir,
+        # logging_dir=logging_dir,
         project_config=accelerator_project_config,
     )
 
@@ -857,20 +871,20 @@ def main(args):
     # So, instead, we monkey-patch the forward calls of its attention-blocks. For this,
     # we first load a dummy pipeline with the text encoder and then do the monkey-patching.
     text_encoder_lora_layers = None
-    if args.train_text_encoder:
-        text_lora_attn_procs = {}
-        for name, module in text_encoder.named_modules():
-            if name.endswith(TEXT_ENCODER_ATTN_MODULE):
-                text_lora_attn_procs[name] = LoRAAttnProcessor(
-                    hidden_size=module.out_proj.out_features, cross_attention_dim=None
-                )
-        text_encoder_lora_layers = AttnProcsLayers(text_lora_attn_procs)
-        temp_pipeline = DiffusionPipeline.from_pretrained(
-            args.pretrained_model_name_or_path, text_encoder=text_encoder
-        )
-        temp_pipeline._modify_text_encoder(text_lora_attn_procs)
-        text_encoder = temp_pipeline.text_encoder
-        del temp_pipeline
+    # if args.train_text_encoder:
+    #     text_lora_attn_procs = {}
+    #     for name, module in text_encoder.named_modules():
+    #         if name.endswith(TEXT_ENCODER_ATTN_MODULE):
+    #             text_lora_attn_procs[name] = LoRAAttnProcessor(
+    #                 hidden_size=module.out_proj.out_features, cross_attention_dim=None
+    #             )
+    #     text_encoder_lora_layers = AttnProcsLayers(text_lora_attn_procs)
+    #     temp_pipeline = DiffusionPipeline.from_pretrained(
+    #         args.pretrained_model_name_or_path, text_encoder=text_encoder
+    #     )
+    #     temp_pipeline._modify_text_encoder(text_lora_attn_procs)
+    #     text_encoder = temp_pipeline.text_encoder
+    #     del temp_pipeline
 
     # create custom saving & loading hooks so that `accelerator.save_state(...)` serializes in a nice format
     def save_model_hook(models, weights, output_dir):
@@ -1010,6 +1024,7 @@ def main(args):
     # Dataset and DataLoaders creation:
     train_dataset = DreamBoothDataset(
         instance_data_root=args.instance_data_dir,
+        instance_data=args.instance_data,
         instance_prompt=args.instance_prompt,
         class_data_root=args.class_data_dir if args.with_prior_preservation else None,
         class_prompt=args.class_prompt,
