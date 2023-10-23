@@ -5,4 +5,7 @@ data/
 __pycache__/*
 results/*
 work_dirs/
+
+# for slurm system
 batchscript-*
+phoenix-slurm-*
