@@ -1,2 +1,8 @@
 loras/
 data/
+
+*/__pycache__/*
+__pycache__/*
+results/*
+work_dirs/
+batchscript-*
