@@ -57,6 +57,10 @@ def train_loras_sbatch(data_item, data_root, promp_template, args):
     image_path = osp.join(data_root, data_item['src_path'])
     prompt = promp_template.format(cls_name)
 
+    if data_item['invalid']:
+        print(f'Ignore invalid item: {image_path} since it is invalid')
+        return
+
     train_step = data_item.get('lora_step', 200)
     if args.step is not None:
         train_step = args.step
@@ -120,7 +124,7 @@ def main():
         for item in benchmark_items:
             cmd = train_loras_sbatch(item, data_root, prompt_template, args)
             cmd_list.append(cmd)
-        cmd_str = '\n'.join(cmd_list)
+        # cmd_str = '\n'.join(cmd_list)
         # if not args.dry_run:
         #     os.system(cmd_str)
     else:
