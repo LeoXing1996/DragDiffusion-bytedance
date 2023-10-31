@@ -120,7 +120,9 @@ def main():
     start_step = 0
     start_layer = 10
 
-    model_path = 'runwayml/stable-diffusion-v1-5'
+    model_path = ('/mnt/petrelfs/xingzhening/.cache/huggingface/'
+                  'diffusers/models--runwayml--stable-diffusion-v1-5/'
+                  'snapshots/39593d5650112b4cc580433f6b0435385882d819')
     vae_path = 'default'
 
     prompt = config.prompt
@@ -129,11 +131,30 @@ def main():
     src_image_path = config.src_path
     tar_image_path = config.tar_path
 
-    source_image = np.array(Image.open(src_image_path))
-    target_image = np.array(Image.open(tar_image_path))
+    source_image_pil = Image.open(src_image_path)
+    target_image_pil = Image.open(tar_image_path)
 
-    image_with_clicks = draw_points(np.array(Image.open(src_image_path)),
-                                    points)
+    # image rescale
+    length = 512
+    w, h = source_image_pil.size
+    new_size = (length, int(length * h / w))
+    resize_ratio = length / w
+
+    source_image_pil = source_image_pil.resize(new_size, Image.BILINEAR)
+    target_image_pil = target_image_pil.resize(new_size, Image.BILINEAR)
+
+    source_image = np.array(source_image_pil)
+    target_image = np.array(target_image_pil)
+
+    # points rescale
+    rescaled_points = []
+    for pair in points:
+        x, y = pair
+        x_scale, y_scale = x * resize_ratio, y * resize_ratio
+        rescaled_points.append([int(x_scale), int(y_scale)])
+    points = rescaled_points
+
+    image_with_clicks = draw_points(np.copy(source_image), points)
     mask = np.array(Image.open(config.mask))
 
     # 2. run drag
@@ -156,10 +177,13 @@ def main():
     os.makedirs(args.work_dir, exist_ok=True)
     Image.fromarray(out_image).save(osp.join(args.work_dir, 'out.png'))
     # 3. run evaluation
-    # out_image = np.array(out_image)  # [0, 255]
-    mask = np.array(Image.open(config.mask))
+    mask = np.array(Image.open(config.mask).resize(new_size, Image.NEAREST))
+    mask[mask > 0] = 1
 
-    mask = mask[..., None]
+    mask = mask[..., None].astype(np.float64)
+    out_image = out_image.astype(np.float64)
+    target_image = target_image.astype(np.float64)
+
     gen_fg = out_image * mask
     tar_fg = target_image * mask
 
