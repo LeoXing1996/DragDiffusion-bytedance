@@ -181,6 +181,7 @@ def run_drag(source_image,
              model_path,
              vae_path,
              lora_path,
+             embedding_path,
              start_step,
              start_layer,
              save_dir="./results"
@@ -238,6 +239,10 @@ def run_drag(source_image,
         print("applying lora: " + lora_path)
         model.unet.load_attn_procs(lora_path)
 
+    if embedding_path:
+        model.load_textual_inversion(embedding_path)
+        print(f'Load textual embedding from {embedding_path}')
+
     # invert the source image
     # the latent code resolution is too small, only 64*64
     invert_code = model.invert(source_image,
@@ -248,6 +253,11 @@ def run_drag(source_image,
 
     mask = torch.from_numpy(mask).float() / 255.
     mask[mask > 0.0] = 1.0
+    if (mask == 0).all():
+        print('mask is all zero, this means all area are background')
+        print('set it to all one to enable edit the entire image.')
+        mask = torch.ones_like(mask)
+
     mask = rearrange(mask, "h w -> 1 1 h w").cuda()
     mask = F.interpolate(mask, (args.sup_res_h, args.sup_res_w), mode="nearest")
 
