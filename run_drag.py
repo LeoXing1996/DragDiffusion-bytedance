@@ -129,10 +129,7 @@ def main():
     points = config.points
 
     src_image_path = config.src_path
-    tar_image_path = config.tar_path
-
     source_image_pil = Image.open(src_image_path)
-    target_image_pil = Image.open(tar_image_path)
 
     # image rescale
     length = 512
@@ -141,10 +138,15 @@ def main():
     resize_ratio = length / w
 
     source_image_pil = source_image_pil.resize(new_size, Image.BILINEAR)
-    target_image_pil = target_image_pil.resize(new_size, Image.BILINEAR)
-
     source_image = np.array(source_image_pil)
-    target_image = np.array(target_image_pil)
+
+    if 'tar_path' in config:
+        tar_image_path = config.tar_path
+        target_image_pil = Image.open(tar_image_path)
+        target_image_pil = target_image_pil.resize(new_size, Image.BILINEAR)
+        target_image = np.array(target_image_pil)
+    else:
+        target_image = None
 
     # points rescale
     rescaled_points = []
@@ -176,6 +178,12 @@ def main():
 
     os.makedirs(args.work_dir, exist_ok=True)
     Image.fromarray(out_image).save(osp.join(args.work_dir, 'out.png'))
+
+    if target_image is None:
+        source_image_pil.save(osp.join(args.work_dir, 'src.png'))
+        print(f'No GT for evaluation. Save source and output to {args.work_dir}')
+        return
+
     # 3. run evaluation
     mask = np.array(Image.open(config.mask).resize(new_size, Image.NEAREST))
     mask[mask > 0] = 1
