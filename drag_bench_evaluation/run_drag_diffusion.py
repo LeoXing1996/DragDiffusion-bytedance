@@ -1,19 +1,19 @@
 # *************************************************************************
 # Copyright (2023) Bytedance Inc.
 #
-# Copyright (2023) DragDiffusion Authors 
+# Copyright (2023) DragDiffusion Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License"); 
-# you may not use this file except in compliance with the License. 
-# You may obtain a copy of the License at 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# Unless required by applicable law or agreed to in writing, software 
-# distributed under the License is distributed on an "AS IS" BASIS, 
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-# See the License for the specific language governing permissions and 
-# limitations under the License. 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 # *************************************************************************
 
 # run results of DragDiffusion
@@ -228,7 +228,12 @@ if __name__ == '__main__':
     for cat in all_category:
         file_dir = os.path.join(root_dir, cat)
         for sample_name in os.listdir(file_dir):
+            if sample_name.startswith('.'):
+                continue
             sample_path = os.path.join(file_dir, sample_name)
+            result_path = os.path.join(result_dir, cat, sample_name, 'dragged_image.png')
+            if os.path.exists(result_path):
+                continue
 
             # read image file
             source_image = Image.open(os.path.join(sample_path, 'original_image.png'))
@@ -263,5 +268,5 @@ if __name__ == '__main__':
             )
             save_dir = os.path.join(result_dir, cat, sample_name)
             if not os.path.isdir(save_dir):
-                os.mkdir(save_dir)
+                os.makedirs(save_dir)
             Image.fromarray(out_image).save(os.path.join(save_dir, 'dragged_image.png'))

@@ -1,19 +1,19 @@
 # *************************************************************************
 # Copyright (2023) Bytedance Inc.
 #
-# Copyright (2023) DragDiffusion Authors 
+# Copyright (2023) DragDiffusion Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License"); 
-# you may not use this file except in compliance with the License. 
-# You may obtain a copy of the License at 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# Unless required by applicable law or agreed to in writing, software 
-# distributed under the License is distributed on an "AS IS" BASIS, 
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-# See the License for the specific language governing permissions and 
-# limitations under the License. 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 # *************************************************************************
 
 import os
@@ -64,7 +64,15 @@ if __name__ == '__main__':
     for cat in all_category:
         file_dir = os.path.join(root_dir, cat)
         for sample_name in os.listdir(file_dir):
+            if sample_name.startswith('.'):
+                continue
             sample_path = os.path.join(file_dir, sample_name)
+
+            result_path = os.path.join(lora_dir, cat, sample_name,
+                                       'pytorch_lora_weights.safetensors')
+            if os.path.exists(result_path):
+                print('Ignore existing lora: ' + result_path)
+                continue
 
             # read image file
             source_image = Image.open(os.path.join(sample_path, 'original_image.png'))
@@ -83,5 +91,6 @@ if __name__ == '__main__':
             # you may also increase the number of lora_step here to train longer
             train_lora(source_image, prompt,
                 model_path="runwayml/stable-diffusion-v1-5",
+                lora_batch_size=1,
                 vae_path="default", save_lora_path=save_lora_path,
                 lora_step=200, lora_lr=0.0002, lora_rank=16, progress=tqdm, save_interval=100)

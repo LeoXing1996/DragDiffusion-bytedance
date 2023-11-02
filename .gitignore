@@ -3,6 +3,9 @@ loras-v1/
 loras-drag-bench/
 lora_tmp/
 data/
+drag_bench_evaluation/drag_bench_data/*
+drag_bench_evaluation/drag_bench_lora/*
+drag_bench_evaluation/drag_diffusion_res/*
 
 */__pycache__/*
 __pycache__/*
