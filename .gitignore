@@ -1,6 +1,7 @@
 loras/
 loras-v1/
 loras-drag-bench/
+lora_tmp/
 data/
 
 */__pycache__/*
