@@ -19,3 +19,4 @@ phoenix-slurm-*
 *.pkl
 *.csv
 *.txt
+*.zip
