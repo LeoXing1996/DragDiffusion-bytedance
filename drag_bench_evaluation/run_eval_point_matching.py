@@ -36,6 +36,7 @@ def get_args():
     parser.add_argument('--root', type=str, default='drag_diffusion_res')
     parser.add_argument('--is-batch', action='store_true')
     parser.add_argument('--save-path', type=str)
+    parser.add_argument('--allow-missing', action='store_true')
     return parser.parse_args()
 
 
@@ -62,7 +63,7 @@ if __name__ == '__main__':
     original_img_root = 'drag_bench_data/'
     # you may put more root path of your results here
     if args.is_batch:
-        evaluate_root = [os.path.join(args.root, folder) for folder in os.listdir(args.root)]
+        evaluate_root = [os.path.join(args.root, folder) for folder in os.listdir(args.root) if os.path.isdir(os.path.join(args.root, folder))]
     else:
         evaluate_root = [args.root]
 
@@ -75,6 +76,13 @@ if __name__ == '__main__':
         tar_result = dict()
         for cat in all_category:
             cat_dist = []
+            cate_root = os.path.join(target_root, cat)
+            if not os.path.exists(cate_root):
+                if args.allow_missing:
+                    print(f'{cate_root} not found.')
+                else:
+                    raise FileNotFoundError(f'{cate_root} not found.')
+
             for file_name in os.listdir(os.path.join(original_img_root, cat)):
                 if file_name.startswith('.'):
                     continue
@@ -94,14 +102,18 @@ if __name__ == '__main__':
                     else:
                         target_points.append(cur_point)
 
-                source_image_path = os.path.join(original_img_root, cat, file_name, 'original_image.png')
-                dragged_image_path = os.path.join(target_root, cat, file_name, 'dragged_image.png')
-                if not os.path.exists(dragged_image_path):
-                    dragged_image_path_ = os.path.join(target_root, cat, file_name, 'drag.png')
-                    assert os.path.exists(dragged_image_path_), (
-                        f'Both {dragged_image_path} and {dragged_image_path_} can not be found, '
-                        'Please check your folder structure.')
-                    dragged_image_path = dragged_image_path_
+                try:
+                    source_image_path = os.path.join(original_img_root, cat, file_name, 'original_image.png')
+                    dragged_image_path = os.path.join(target_root, cat, file_name, 'dragged_image.png')
+                    if not os.path.exists(dragged_image_path):
+                        dragged_image_path_ = os.path.join(target_root, cat, file_name, 'drag.png')
+                        assert os.path.exists(dragged_image_path_), (
+                            f'Both {dragged_image_path} and {dragged_image_path_} can not be found, '
+                            'Please check your folder structure.')
+                        dragged_image_path = dragged_image_path_
+                except Exception:
+                    import ipdb
+                    ipdb.set_trace()
 
                 source_image_PIL = Image.open(source_image_path)
                 dragged_image_PIL = Image.open(dragged_image_path)

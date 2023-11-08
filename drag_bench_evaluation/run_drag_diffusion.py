@@ -30,7 +30,7 @@ import PIL
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from diffusers import AutoencoderKL, DDIMScheduler
+from diffusers import AutoencoderKL, DDIMScheduler, DPMSolverMultistepScheduler
 from einops import rearrange
 from PIL import Image
 from pytorch_lightning import seed_everything
@@ -69,12 +69,19 @@ def preprocess_image(image, device):
 def get_args():
     parser = ArgumentParser()
     parser.add_argument('--baseline', action='store_true')
+    parser.add_argument('--quick-run', action='store_true')
+
     parser.add_argument('--cate', type=str)
     parser.add_argument('--work-dir', type=str)
 
     parser.add_argument('--restart-strategy', type=str)
     parser.add_argument('--restart-interval', type=int, default=20)
+    parser.add_argument('--restart-times', type=int, default=0)
+    parser.add_argument('--restart-fix', action='store_true')
+
     parser.add_argument('--drag-steps', type=int, default=1)
+    parser.add_argument('--n-pix-step', type=int, default=80)
+    parser.add_argument('--diffedit', action='store_true')
 
     parser.add_argument('--loss-type', type=str, default='l1')
     parser.add_argument('--loss-scale', type=float, default=10.0)
@@ -104,6 +111,22 @@ def run_drag(
     # initialize model
     device = torch.device(
         "cuda") if torch.cuda.is_available() else torch.device("cpu")
+    # if user_args.restart_strategy:
+    #     scheduler = DPMSolverMultistepScheduler(
+    #         beta_start=0.00085,
+    #         beta_end=0.012,
+    #         beta_schedule="scaled_linear",
+    #         clip_sample=False,
+    #         set_alpha_to_one=False,
+    #         use_karras_sigmas=True,
+    #         steps_offset=1)
+    # else:
+    #     scheduler = DDIMScheduler(beta_start=0.00085,
+    #                               beta_end=0.012,
+    #                               beta_schedule="scaled_linear",
+    #                               clip_sample=False,
+    #                               set_alpha_to_one=False,
+    #                               steps_offset=1)
     scheduler = DDIMScheduler(beta_start=0.00085,
                               beta_end=0.012,
                               beta_schedule="scaled_linear",
@@ -151,6 +174,9 @@ def run_drag(
     # add restart-related args to namespace
     args.restart_strategy = user_args.restart_strategy
     args.restart_interval = user_args.restart_interval
+    args.restart_times = user_args.restart_times
+    args.restart_fix = user_args.restart_fix
+    args.diffedit = user_args.diffedit
     args.drag_steps = user_args.drag_steps
 
     # add consine loss func args
@@ -218,21 +244,22 @@ def run_drag(
     # feature shape: [1280,16,16], [1280,32,32], [640,64,64], [320,64,64]
     # update according to the given supervision
     if args.baseline:
-        idx = 0
+        shift = 0
         updated_init_code = drag_diffusion_update(model, init_code, t,
                                                   handle_points, target_points,
                                                   mask, args)
         # for baseline, registry masactrl after drag
-        model = registry_masactrl(model, editor, lora_path)
+        # model = registry_masactrl(model, editor, lora_path)
     else:
         # for our implementation, registry masactrl before drag
-        model = registry_masactrl(model, editor, lora_path)
-        updated_init_code, idx = drag_diffusion_update_restart_multi(
+        # model = registry_masactrl(model, editor, lora_path)
+        updated_init_code, shift = drag_diffusion_update_restart_multi(
             model, init_code, t,
             handle_points, target_points,
-            mask, args)
+            mask, args, editor)
 
-    args.n_actual_inference_step += idx
+    model = registry_masactrl(model, editor, lora_path)
+    args.n_actual_inference_step += shift
 
     # inference the synthesized image
     gen_image = model(
@@ -281,12 +308,19 @@ if __name__ == '__main__':
         'interior_design',
         'other_objects',
     ]
+    # torch.backends.cuda.matmul.allow_tf32 = False
+    # torch.backends.cudnn.benchmark = False
+    # torch.backends.cudnn.deterministic = True
+    # torch.use_deterministic_algorithms(True)
 
     if args.cate is not None:
         assert args.cate in all_category, (
             f'User defined cate ({args.cate}) must be in all categorys.')
         print(f'Run drag on cate {args.cate}')
         all_category = [args.cate]
+
+    if args.quick_run:
+        all_category = ['animals']
 
     # assume root_dir and lora_dir are valid directory
     root_dir = 'drag_bench_data'
@@ -305,8 +339,8 @@ if __name__ == '__main__':
     for cat in all_category:
         file_dir = os.path.join(root_dir, cat)
         for sample_name in os.listdir(file_dir):
-            # if sample_name != 'JH_2023-09-14-1837-39':
-            #     continue
+            if sample_name != 'JH_2023-09-14-1823-02':
+                continue
             if sample_name.startswith('.'):
                 continue
             sample_path = os.path.join(file_dir, sample_name)
@@ -344,7 +378,7 @@ if __name__ == '__main__':
                 inversion_strength=0.7,
                 lam=0.1,
                 latent_lr=0.01,
-                n_pix_step=80,
+                n_pix_step=args.n_pix_step,
                 model_path="runwayml/stable-diffusion-v1-5",
                 vae_path="default",
                 lora_path=lora_path,

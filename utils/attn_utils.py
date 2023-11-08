@@ -137,6 +137,7 @@ def override_attn_proc_forward(attn, editor, place_in_unet):
 # modified from __call__ function of LoRAAttnProcessor2_0 in diffusers v0.17.1
 def override_lora_attn_proc_forward(attn, editor, place_in_unet):
     def forward(hidden_states, encoder_hidden_states=None, attention_mask=None, lora_scale=1.0):
+
         residual = hidden_states
         input_ndim = hidden_states.ndim
         is_cross = encoder_hidden_states is not None
@@ -219,3 +220,12 @@ def register_attention_editor_diffusers(model, editor: AttentionBase, attn_proce
         elif "up" in net_name:
             cross_att_count += register_editor(net, 0, "up")
     editor.num_att_layers = cross_att_count
+
+
+def offload_masactrl(model, is_lora=True):
+    if is_lora:
+        attn_processor = 'lora_attn_proc'
+    else:
+        attn_processor = 'attn_proc'
+    register_attention_editor_diffusers(
+        model, AttentionBase(), attn_processor)
