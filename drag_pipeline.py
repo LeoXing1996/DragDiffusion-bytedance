@@ -1,19 +1,19 @@
 # *************************************************************************
 # Copyright (2023) Bytedance Inc.
 #
-# Copyright (2023) DragDiffusion Authors 
+# Copyright (2023) DragDiffusion Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License"); 
-# you may not use this file except in compliance with the License. 
-# You may obtain a copy of the License at 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# Unless required by applicable law or agreed to in writing, software 
-# distributed under the License is distributed on an "AS IS" BASIS, 
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-# See the License for the specific language governing permissions and 
-# limitations under the License. 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 # *************************************************************************
 
 import torch
@@ -260,6 +260,20 @@ class DragPipeline(StableDiffusionPipeline):
         x_prev = alpha_prod_t_prev**0.5 * pred_x0 + pred_dir
         return x_prev, pred_x0
 
+    def step_with_guidance(self, model_output, timestep, x, gradient):
+
+        prev_timestep = timestep - self.scheduler.config.num_train_timesteps // self.scheduler.num_inference_steps
+        alpha_prod_t = self.scheduler.alphas_cumprod[timestep]
+        alpha_prod_t_prev = self.scheduler.alphas_cumprod[prev_timestep] if prev_timestep > 0 else self.scheduler.final_alpha_cumprod
+        beta_prod_t = 1 - alpha_prod_t
+
+        model_output = model_output - gradient * (beta_prod_t ** 0.5)
+
+        pred_x0 = (x - beta_prod_t**0.5 * model_output) / alpha_prod_t**0.5
+        pred_dir = (1 - alpha_prod_t_prev)**0.5 * model_output
+        x_prev = alpha_prod_t_prev**0.5 * pred_x0 + pred_dir
+        return x_prev, pred_x0
+
     @torch.no_grad()
     def image2latent(self, image):
         DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -394,7 +408,7 @@ class DragPipeline(StableDiffusionPipeline):
                 model_inputs = latents
             if unconditioning is not None and isinstance(unconditioning, list):
                 _, text_embeddings = text_embeddings.chunk(2)
-                text_embeddings = torch.cat([unconditioning[i].expand(*text_embeddings.shape), text_embeddings]) 
+                text_embeddings = torch.cat([unconditioning[i].expand(*text_embeddings.shape), text_embeddings])
             # predict the noise
             noise_pred = self.unet(model_inputs, t, encoder_hidden_states=text_embeddings)
             if guidance_scale > 1.0:

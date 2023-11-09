@@ -22,9 +22,9 @@ def draw_loss(loss_list, dist_list, restart_list, save_dir, save_suffix=None):
 
     fig, ax1 = plt.subplots()
     ax1.set_ylabel('Loss')
-    for idx in index:
-        if restart_list[idx]:
-            ax1.vlines(x=idx, ymin=0, ymax=max(loss_list), colors='r', linestyles='dashed')
+    # for idx in index:
+    #     if restart_list[idx]:
+    #         ax1.vlines(x=idx, ymin=0, ymax=max(loss_list), colors='r', linestyles='dashed')
     ax1.plot(index, loss_list, color='b')
 
     ax2 = ax1.twinx()

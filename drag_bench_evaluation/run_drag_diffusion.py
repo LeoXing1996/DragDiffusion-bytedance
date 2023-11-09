@@ -76,9 +76,13 @@ def get_args():
 
     parser.add_argument('--restart-strategy', type=str)
     parser.add_argument('--restart-interval', type=int, default=20)
+    parser.add_argument('--restart-with-masactrl', action='store_true')
     parser.add_argument('--restart-times', type=int, default=0)
     parser.add_argument('--restart-fix', action='store_true')
 
+    parser.add_argument('--wo-pt', action='store_true')
+
+    parser.add_argument('--inversion-strength', type=float, default=0.7)
     parser.add_argument('--drag-steps', type=int, default=1)
     parser.add_argument('--n-pix-step', type=int, default=80)
     parser.add_argument('--diffedit', action='store_true')
@@ -176,6 +180,8 @@ def run_drag(
     args.restart_interval = user_args.restart_interval
     args.restart_times = user_args.restart_times
     args.restart_fix = user_args.restart_fix
+    args.restart_with_masactrl = user_args.restart_with_masactrl
+    args.wo_pt = user_args.wo_pt
     args.diffedit = user_args.diffedit
     args.drag_steps = user_args.drag_steps
 
@@ -320,7 +326,7 @@ if __name__ == '__main__':
         all_category = [args.cate]
 
     if args.quick_run:
-        all_category = ['animals']
+        all_category = ['animals', 'building_city_view', 'art_work', 'building_city_view', 'human_full_body']
 
     # assume root_dir and lora_dir are valid directory
     root_dir = 'drag_bench_data'
@@ -334,13 +340,11 @@ if __name__ == '__main__':
     if not os.path.isdir(result_dir):
         os.mkdir(result_dir)
         for cat in all_category:
-            os.mkdir(os.path.join(result_dir, cat))
+            os.makedirs(os.path.join(result_dir, cat), exist_ok=True)
 
     for cat in all_category:
         file_dir = os.path.join(root_dir, cat)
         for sample_name in os.listdir(file_dir):
-            if sample_name != 'JH_2023-09-14-1823-02':
-                continue
             if sample_name.startswith('.'):
                 continue
             sample_path = os.path.join(file_dir, sample_name)
@@ -375,7 +379,7 @@ if __name__ == '__main__':
                 mask,
                 prompt,
                 points,
-                inversion_strength=0.7,
+                inversion_strength=args.inversion_strength,
                 lam=0.1,
                 latent_lr=0.01,
                 n_pix_step=args.n_pix_step,
