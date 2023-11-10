@@ -43,7 +43,9 @@ def override_forward(self):
         mid_block_additional_residual: Optional[torch.Tensor] = None,
         return_intermediates: bool = False,
         last_up_block_idx: int = None,
+        return_residual_size=False,
     ):
+        down_residual_size_list = []
         # By default samples have to be AT least a multiple of the overall upsampling factor.
         # The overall upsampling factor is equal to 2 ** (# num of upsampling layers).
         # However, the upsampling interpolation output size can be forced to fit any upsampling size
@@ -150,6 +152,9 @@ def override_forward(self):
 
             down_block_res_samples = new_down_block_res_samples
 
+        for sample in down_block_res_samples:
+            down_residual_size_list.append(sample.shape)
+
         # 4. mid
         if self.mid_block is not None:
             sample = self.mid_block(
@@ -162,6 +167,10 @@ def override_forward(self):
 
         if mid_block_additional_residual is not None:
             sample = sample + mid_block_additional_residual
+        mid_residual_size = sample.shape
+
+        if return_residual_size:
+            return down_residual_size_list, mid_residual_size
 
         # 5. up
         # only difference from diffusers:
@@ -319,12 +328,15 @@ class DragPipeline(StableDiffusionPipeline):
 
     # get all intermediate features and then do bilinear interpolation
     # return features in the layer_idx list
-    def forward_unet_features(self, z, t, encoder_hidden_states, layer_idx=[0], interp_res_h=256, interp_res_w=256):
+    def forward_unet_features(self, z, t, encoder_hidden_states, layer_idx=[0], interp_res_h=256, interp_res_w=256,
+                              down_residuals=None, mid_residuals=None):
         unet_output, all_intermediate_features = self.unet(
             z,
             t,
             encoder_hidden_states=encoder_hidden_states,
-            return_intermediates=True
+            return_intermediates=True,
+            down_block_additional_residuals=down_residuals,
+            mid_block_additional_residual=mid_residuals,
             )
 
         all_return_features = []

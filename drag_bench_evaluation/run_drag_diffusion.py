@@ -24,7 +24,6 @@ import sys
 from argparse import ArgumentParser
 from copy import deepcopy
 from types import SimpleNamespace
-
 import numpy as np
 import PIL
 import torch
@@ -79,6 +78,7 @@ def get_args():
     parser.add_argument('--restart-with-masactrl', action='store_true')
     parser.add_argument('--restart-times', type=int, default=0)
     parser.add_argument('--restart-fix', action='store_true')
+    parser.add_argument('--update-residual', action='store_true')
 
     parser.add_argument('--wo-pt', action='store_true')
 
@@ -184,6 +184,8 @@ def run_drag(
     args.wo_pt = user_args.wo_pt
     args.diffedit = user_args.diffedit
     args.drag_steps = user_args.drag_steps
+
+    args.update_residual = user_args.update_residual
 
     # add consine loss func args
     args.loss_type = user_args.loss_type
